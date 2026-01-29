@@ -1,9 +1,8 @@
-import "./global.css";
+import "./globals.css";
 import type { ReactNode } from "react";
 
 export const metadata = {
-  title: "APE — Automated Portfolio Evaluator",
-  description: "AI Portfolio Decision Co-Pilot (Automated Portfolio Evaluator)",
+  title: "Talk to the APE",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
