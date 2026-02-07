@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/decision-principles-catalogue.schema.json",
+  "title": "Decision Principles Catalogue",
+  "type": "object",
+  "required": ["metadata", "changelog", "entries"],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": ["title", "version", "last_updated"],
+      "properties": {
+        "title": { "type": "string" },
+        "version": { "type": "string" },
+        "last_updated": { "type": "string", "format": "date" }
+      },
+      "additionalProperties": false
+    },
+    "changelog": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["version", "date", "notes"],
+        "properties": {
+          "version": { "type": "string" },
+          "date": { "type": "string", "format": "date" },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "question",
+          "required_inputs",
+          "inaction_conditions",
+          "mandatory_action_conditions"
+        ],
+        "properties": {
+          "id": { "type": "string", "pattern": "^DPQ-\\d{3}$" },
+          "question": { "type": "string" },
+          "required_inputs": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          },
+          "inaction_conditions": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/condition" },
+            "minItems": 1
+          },
+          "mandatory_action_conditions": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/condition" },
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "$defs": {
+    "condition": {
+      "type": "object",
+      "required": ["id", "description"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^(IC|MAC)-\\d{3}$" },
+        "description": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
