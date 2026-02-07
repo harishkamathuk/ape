@@ -121,5 +121,49 @@
 
 ---
 
+## 2026-02-07 — Iteration M3b (Show Your Work)
+### Added
+- Evaluation fields for policy application (`policy_applied`), deterministic drift (`drift`), and correctness (`correctness`).
+- Contradiction rejection with deterministic fail status and structured error codes.
+- Golden reference snapshots under `artifacts/reference/milestone-3b/` (reference outputs only).
+- Dev-only escape hatch: `ALLOW_ARTIFACTS_READ=true` to permit artifact reads in local/dev scenarios (non-default).
+- Unit tests enforcing “no artifacts read by default” and “missing config fails fast”.
+
+### Changed
+- If `portfolio_state` exists, the system never asks for weights.
+- Deterministic drift and policy application details are now explicit in snapshots.
+- Runtime policy loading now requires explicit configuration via `POLICY_PATH` or `POLICY_DIR`; runtime no longer reads policy directly from repo `artifacts/...`.
+- If no policy source is configured, the service fails fast with a clear runtime error.
+
+### Fixed
+- N/A
+
+### Removed
+- N/A
+
+### Data / Schema
+- Decision Snapshot evaluation section expanded to include policy-applied provenance, drift status, and correctness status.
+
+### Risks / Follow-ups
+- M3c guardrail expansions remain out of scope.
+
+### Manual regression checks (quick)
+- [ ] Portfolio state present → no request for weights; drift status is deterministic.
+- [ ] Contradiction between model output and deterministic expectation yields `correctness=fail`.
+- [ ] Drift evaluation is populated or explicitly marked not applicable/cannot compute.
+- [ ] With no `POLICY_PATH`/`POLICY_DIR`, startup/request fails fast (no silent artifacts fallback).
+- [ ] With `POLICY_PATH` or `POLICY_DIR` set, policy loads successfully and snapshot includes normal policy provenance.
+- [ ] With `ALLOW_ARTIFACTS_READ=true` (dev only), artifact-based policy load is permitted; without it, artifact reads are rejected.
+
+### Tests
+- `cd agent && npm test`
+
+### Paths touched
+- `agent/lib/domain/decisionSnapshot.ts`
+- `agent/lib/services/decisionService.ts`
+- `agent/lib/services/decisionSnapshotContract.m3b.test.ts`
+- `artifacts/reference/milestone-3b/*`
+
+---
 ## Milestone 3c Marker
 Backfilled documentation is complete through Milestone 3c.
