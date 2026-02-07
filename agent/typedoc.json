@@ -9,5 +9,6 @@
   "out": "../docs/reference/api",
   "plugin": ["typedoc-plugin-markdown"],
   "excludePrivate": true,
-  "excludeInternal": true
+  "excludeInternal": true,
+  "skipErrorChecking": true
 }
