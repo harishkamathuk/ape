@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   loadCatalogue,
+  loadText,
+  validateCatalogueMarkdown,
   validateAgainstSchema,
+  validateFreezeMetadata,
   validateMappingCompleteness,
   validateNoDeferredReasoningLanguage,
   validateUniqueIds,
@@ -23,6 +26,13 @@ const schemaPath = path.join(
   "policy",
   "default",
   "decision-principles-catalogue.schema.json"
+);
+const markdownPath = path.join(
+  repoRoot,
+  "artifacts",
+  "policy",
+  "default",
+  "decision-principles-catalogue.md"
 );
 
 function clone<T>(value: T): T {
@@ -49,6 +59,18 @@ describe("Decision Principles Catalogue - machine addressability", () => {
     expect(errors).toEqual([]);
   });
 
+  it("policyCatalogue.freezeMetadataPresent", () => {
+    const catalogue = loadCatalogue(cataloguePath);
+    const errors = validateFreezeMetadata(catalogue);
+    expect(errors).toEqual([]);
+  });
+
+  it("policyCatalogue.markdownHasVersionAndChangelog", () => {
+    const markdown = loadText(markdownPath);
+    const errors = validateCatalogueMarkdown(markdown);
+    expect(errors).toEqual([]);
+  });
+
   it("rejects duplicate question_id", () => {
     const catalogue = clone(loadCatalogue(cataloguePath) as any);
     catalogue.principles[1].question_id = catalogue.principles[0].question_id;
@@ -67,6 +89,20 @@ describe("Decision Principles Catalogue - machine addressability", () => {
     const catalogue = clone(loadCatalogue(cataloguePath) as any);
     catalogue.principles[0].rationale = "TBD";
     const errors = validateNoDeferredReasoningLanguage(catalogue);
+    expect(errors.length).toBeGreaterThan(0);
+  });
+
+  it("rejects missing catalogue_version", () => {
+    const catalogue = clone(loadCatalogue(cataloguePath) as any);
+    delete catalogue.metadata.catalogue_version;
+    const errors = validateFreezeMetadata(catalogue);
+    expect(errors.length).toBeGreaterThan(0);
+  });
+
+  it("rejects empty changelog", () => {
+    const catalogue = clone(loadCatalogue(cataloguePath) as any);
+    catalogue.metadata.changelog = [];
+    const errors = validateFreezeMetadata(catalogue);
     expect(errors.length).toBeGreaterThan(0);
   });
 });

@@ -16,10 +16,17 @@ const FORBIDDEN_PHRASES = [
   "infer later",
 ];
 
+const CATALOGUE_VERSION_PATTERN = /^(\d+\.\d+\.\d+|\d{4}-\d{2}-\d{2})$/;
+
 export function loadCatalogue(path: string): unknown {
   const fs = require("node:fs") as typeof import("node:fs");
   const raw = fs.readFileSync(path, "utf-8");
   return JSON.parse(raw) as unknown;
+}
+
+export function loadText(path: string): string {
+  const fs = require("node:fs") as typeof import("node:fs");
+  return fs.readFileSync(path, "utf-8");
 }
 
 export function validateAgainstSchema(
@@ -88,6 +95,60 @@ export function validateMappingCompleteness(catalogueJson: any): ValidationError
       });
     }
   });
+
+  return errors;
+}
+
+export function validateFreezeMetadata(catalogueJson: any): ValidationError[] {
+  const errors: ValidationError[] = [];
+  const metadata = catalogueJson?.metadata ?? {};
+
+  if (!isNonEmptyString(metadata.catalogue_version)) {
+    errors.push({
+      path: "$.metadata.catalogue_version",
+      message: "catalogue_version is required and must be non-empty.",
+      keyword: "required",
+    });
+  } else if (!CATALOGUE_VERSION_PATTERN.test(metadata.catalogue_version)) {
+    errors.push({
+      path: "$.metadata.catalogue_version",
+      message: "catalogue_version must be semver (X.Y.Z) or date-based (YYYY-MM-DD).",
+      keyword: "pattern",
+    });
+  }
+
+  const changelog = metadata.changelog;
+  if (!Array.isArray(changelog) || changelog.length === 0) {
+    errors.push({
+      path: "$.metadata.changelog",
+      message: "changelog is required and must contain at least one entry.",
+      keyword: "minItems",
+    });
+  }
+
+  return errors;
+}
+
+export function validateCatalogueMarkdown(markdown: string): ValidationError[] {
+  const errors: ValidationError[] = [];
+  const hasVersion = /^version:\s*\S+/m.test(markdown);
+  const hasChangelog = /^##\s+Changelog\b/m.test(markdown);
+
+  if (!hasVersion) {
+    errors.push({
+      path: "$.markdown.front_matter.version",
+      message: "Catalogue markdown must include a version header.",
+      keyword: "required",
+    });
+  }
+
+  if (!hasChangelog) {
+    errors.push({
+      path: "$.markdown.sections.changelog",
+      message: "Catalogue markdown must include a Changelog section.",
+      keyword: "required",
+    });
+  }
 
   return errors;
 }

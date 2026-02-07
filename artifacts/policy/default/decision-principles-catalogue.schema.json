@@ -12,7 +12,11 @@
       "required": ["schema_version", "catalogue_version", "changelog"],
       "properties": {
         "schema_version": { "type": "string", "description": "Schema version identifier." },
-        "catalogue_version": { "type": "string", "description": "Catalogue content version." },
+        "catalogue_version": {
+          "type": "string",
+          "pattern": "^(\\d+\\.\\d+\\.\\d+|\\d{4}-\\d{2}-\\d{2})$",
+          "description": "Catalogue content version (semver X.Y.Z or date-based YYYY-MM-DD)."
+        },
         "generated_at": { "type": "string", "format": "date-time", "description": "Optional generation timestamp." },
         "changelog": {
           "type": "array",
