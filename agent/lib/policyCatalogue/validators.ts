@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import Ajv, { type ErrorObject } from "ajv/dist/2020";
 
 export type ValidationError = {
@@ -19,14 +20,12 @@ const FORBIDDEN_PHRASES = [
 const CATALOGUE_VERSION_PATTERN = /^(\d+\.\d+\.\d+|\d{4}-\d{2}-\d{2})$/;
 
 export function loadCatalogue(path: string): unknown {
-  const fs = require("node:fs") as typeof import("node:fs");
-  const raw = fs.readFileSync(path, "utf-8");
+  const raw = readFileSync(path, "utf-8");
   return JSON.parse(raw) as unknown;
 }
 
 export function loadText(path: string): string {
-  const fs = require("node:fs") as typeof import("node:fs");
-  return fs.readFileSync(path, "utf-8");
+  return readFileSync(path, "utf-8");
 }
 
 export function validateAgainstSchema(
@@ -47,13 +46,13 @@ export function validateAgainstSchema(
   }));
 }
 
-export function validateUniqueIds(catalogueJson: any): ValidationError[] {
-  const principles = catalogueJson?.principles ?? [];
+export function validateUniqueIds(catalogueJson: unknown): ValidationError[] {
+  const principles = getPrinciples(catalogueJson);
   const seen = new Map<string, number[]>();
 
-  principles.forEach((p: any, idx: number) => {
-    const id = p?.question_id;
-    if (typeof id !== "string") return;
+  principles.forEach((p, idx) => {
+    const id = getString(p, "question_id");
+    if (!id) return;
     const list = seen.get(id) ?? [];
     list.push(idx);
     seen.set(id, list);
@@ -74,20 +73,22 @@ export function validateUniqueIds(catalogueJson: any): ValidationError[] {
   return errors;
 }
 
-export function validateMappingCompleteness(catalogueJson: any): ValidationError[] {
-  const principles = catalogueJson?.principles ?? [];
+export function validateMappingCompleteness(catalogueJson: unknown): ValidationError[] {
+  const principles = getPrinciples(catalogueJson);
   const errors: ValidationError[] = [];
 
-  principles.forEach((p: any, idx: number) => {
-    const mapping = p?.ipm_mapping ?? {};
-    if (!isNonEmptyString(mapping.ipm_section_heading)) {
+  principles.forEach((p, idx) => {
+    const mapping = getObject(p, "ipm_mapping");
+    const section = getString(mapping, "ipm_section_heading");
+    const fieldKey = getString(mapping, "ipm_field_key");
+    if (!isNonEmptyString(section)) {
       errors.push({
         path: `$.principles[${idx}].ipm_mapping.ipm_section_heading`,
         message: "ipm_section_heading is required and must be non-empty.",
         keyword: "required",
       });
     }
-    if (!isNonEmptyString(mapping.ipm_field_key)) {
+    if (!isNonEmptyString(fieldKey)) {
       errors.push({
         path: `$.principles[${idx}].ipm_mapping.ipm_field_key`,
         message: "ipm_field_key is required and must be non-empty.",
@@ -99,17 +100,18 @@ export function validateMappingCompleteness(catalogueJson: any): ValidationError
   return errors;
 }
 
-export function validateFreezeMetadata(catalogueJson: any): ValidationError[] {
+export function validateFreezeMetadata(catalogueJson: unknown): ValidationError[] {
   const errors: ValidationError[] = [];
-  const metadata = catalogueJson?.metadata ?? {};
+  const metadata = getObject(catalogueJson, "metadata");
 
-  if (!isNonEmptyString(metadata.catalogue_version)) {
+  const catalogueVersion = getString(metadata, "catalogue_version");
+  if (!isNonEmptyString(catalogueVersion)) {
     errors.push({
       path: "$.metadata.catalogue_version",
       message: "catalogue_version is required and must be non-empty.",
       keyword: "required",
     });
-  } else if (!CATALOGUE_VERSION_PATTERN.test(metadata.catalogue_version)) {
+  } else if (!CATALOGUE_VERSION_PATTERN.test(catalogueVersion)) {
     errors.push({
       path: "$.metadata.catalogue_version",
       message: "catalogue_version must be semver (X.Y.Z) or date-based (YYYY-MM-DD).",
@@ -117,7 +119,7 @@ export function validateFreezeMetadata(catalogueJson: any): ValidationError[] {
     });
   }
 
-  const changelog = metadata.changelog;
+  const changelog = getArray(metadata, "changelog");
   if (!Array.isArray(changelog) || changelog.length === 0) {
     errors.push({
       path: "$.metadata.changelog",
@@ -172,6 +174,36 @@ export function validateNoDeferredReasoningLanguage(catalogueJson: unknown): Val
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function getObject(value: unknown, key: string): Record<string, unknown> {
+  if (!value || typeof value !== "object") return {};
+  const record = value as Record<string, unknown>;
+  const candidate = record[key];
+  if (!candidate || typeof candidate !== "object") return {};
+  return candidate as Record<string, unknown>;
+}
+
+function getArray(value: unknown, key: string): unknown[] {
+  if (!value || typeof value !== "object") return [];
+  const record = value as Record<string, unknown>;
+  const candidate = record[key];
+  return Array.isArray(candidate) ? candidate : [];
+}
+
+function getString(value: unknown, key: string): string | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  const candidate = record[key];
+  return typeof candidate === "string" ? candidate : undefined;
+}
+
+function getPrinciples(catalogueJson: unknown): Record<string, unknown>[] {
+  if (!catalogueJson || typeof catalogueJson !== "object") return [];
+  const record = catalogueJson as Record<string, unknown>;
+  const principles = record.principles;
+  if (!Array.isArray(principles)) return [];
+  return principles.filter((p) => p && typeof p === "object") as Record<string, unknown>[];
 }
 
 function toJsonPath(instancePath: string): string {
