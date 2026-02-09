@@ -332,13 +332,25 @@ describe("runDecision", () => {
         {
           role: "user",
           content:
-            "Evaluate my portfolio against the current investment policy.\n\nPortfolio state:\n- Total value: £100,000\n- Asset allocation:\n  - Equities: 81%\n  - Bonds: 14%\n  - Cash: 5%\n\nThere are no new contributions or withdrawals.\n\nIf action is not justified by policy, explicitly recommend inaction.\nGenerate a decision snapshot.",
+            "Evaluate my portfolio against the current investment policy using the provided portfolio_state. If action is not justified by policy, explicitly recommend inaction. Generate a decision snapshot.",
         },
       ],
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
       risk_inputs: defaultRiskInputs,
     });
 
+    expect(result.snapshot.outcome_state).toBe("RECOMMEND_NO_ACTION");
     expect(result.snapshot.recommendation.type).toBe("DO_NOTHING");
+    expect(result.snapshot.evaluation.drift.status).toBe("computed");
+    expect(result.snapshot.evaluation.drift_analysis.bands_breached).toBe(false);
   });
 
   it("recommends rebalancing via contributions when in-band with contributions (3c prompt C)", async () => {
