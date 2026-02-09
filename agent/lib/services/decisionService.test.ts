@@ -305,13 +305,25 @@ describe("runDecision", () => {
         {
           role: "user",
           content:
-            "Evaluate my portfolio against the current investment policy.\n\nPortfolio state:\n- Total value: £100,000\n- Asset allocation:\n  - Equities: 86%\n  - Bonds: 9%\n  - Cash: 5%\n\nCash flows:\n- Planned contribution: £5,000\n- No withdrawals\n\nGenerate a decision snapshot and recommendation.",
+            "Evaluate my portfolio against the current investment policy using the provided portfolio_state. Generate a decision snapshot and recommendation.",
         },
       ],
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.88, BONDS: 0.08, CASH: 0.04 },
+        cash_flows: {
+          pending_contributions_gbp: 5000,
+          pending_withdrawals_gbp: 0,
+        },
+      },
       risk_inputs: defaultRiskInputs,
     });
 
+    expect(result.snapshot.outcome_state).toBe("RECOMMEND_ACTION");
     expect(result.snapshot.recommendation.type).toBe("REBALANCE_VIA_CONTRIBUTIONS");
+    expect(result.snapshot.evaluation.drift.status).toBe("computed");
+    expect(result.snapshot.evaluation.drift_analysis.bands_breached).toBe(true);
   });
 
   it("overrides temptation to act when drift is in band with no cash flows (scenario 5)", async () => {
