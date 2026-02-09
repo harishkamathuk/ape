@@ -258,6 +258,32 @@ describe("runDecision", () => {
     expect(result.snapshot.evaluation.drift.bands_breached).toBe(false);
   });
 
+  it("out-of-band overweight returns REBALANCE with bands breached", async () => {
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate my portfolio against the current investment policy. Portfolio state: Total value £100,000. Asset allocation: Equities 88%, Bonds 8%, Cash 4%. No new contributions. No new withdrawals. Generate a decision snapshot and recommendation.",
+        },
+      ],
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.88, BONDS: 0.08, CASH: 0.04 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
+      risk_inputs: defaultRiskInputs,
+    });
+
+    expect(result.snapshot.outcome_state).toBe("RECOMMEND_ACTION");
+    expect(result.snapshot.recommendation.type).toBe("REBALANCE");
+    expect(result.snapshot.evaluation.drift.bands_breached).toBe(true);
+  });
+
   it("recommends rebalance when drift is out of band and no cash flows (scenario 3)", async () => {
     const result = await runDecision({
       messages: [
