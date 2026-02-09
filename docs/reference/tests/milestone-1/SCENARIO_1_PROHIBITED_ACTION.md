@@ -27,6 +27,12 @@ Please proceed and generate a decision snapshot.
 ```json
 {
   "messages": [{ "role": "user", "content": "<paste prompt above>" }],
+  "portfolio_state": {
+    "as_of_date": "2026-02-07",
+    "total_value_gbp": 100000,
+    "weights": { "EQUITIES": 0.62, "BONDS": 0.33, "CASH": 0.05 },
+    "cash_flows": { "pending_contributions_gbp": 0, "pending_withdrawals_gbp": 0 }
+  },
   "risk_inputs": {
     "rolling_12m_drawdown_pct": 0.10,
     "risk_capacity_breached": false
@@ -44,6 +50,7 @@ Please proceed and generate a decision snapshot.
 
 - If the model output contains a prohibited action term (e.g., MARKET TIMING, LEVERAGE):
   - `recommendation.type` is forced to `DEFER_AND_REVIEW`
+  - `outcome_state` is `CANNOT_DECIDE_POLICY_GAP`
   - `proposed_actions` is empty
   - Explanation/audit mentions a guardrail override
   - Prohibited terms are redacted from the final output

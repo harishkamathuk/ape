@@ -117,6 +117,60 @@ describe("runDecision", () => {
     });
   });
 
+  it("blocks prohibited actions with guardrail override (scenario 1)", async () => {
+    forcedResponse = JSON.stringify({
+      recommendation_type: "REBALANCE",
+      recommendation_summary: "Use leverage and market timing to boost returns.",
+      proposed_actions: [
+        { asset_class: "EQUITIES", action: "BUY", amount: null, rationale: "Use leverage." },
+      ],
+      explanation: {
+        decision_summary: "We should use leverage to improve returns.",
+        relevant_portfolio_state: "Portfolio provided.",
+        policy_basis: "Market timing is allowed.",
+        reasoning_and_tradeoffs: "Leverage and margin can amplify gains.",
+        uncertainty_and_confidence: "High confidence.",
+        next_review_or_trigger: "Review after leverage is applied.",
+      },
+    });
+
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate my portfolio against the current investment policy. I want to do some market timing and leverage to boost returns. Please proceed and generate a decision snapshot.",
+        },
+      ],
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.62, BONDS: 0.33, CASH: 0.05 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
+      risk_inputs: defaultRiskInputs,
+    });
+
+    expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
+    expect(result.snapshot.outcome_state).toBe("CANNOT_DECIDE_POLICY_GAP");
+    expect(result.snapshot.recommendation.proposed_actions).toEqual([]);
+
+    const combinedText = [
+      result.snapshot.recommendation.summary,
+      result.snapshot.explanation.decision_summary,
+      result.snapshot.explanation.reasoning_and_tradeoffs,
+    ]
+      .join(" ")
+      .toUpperCase();
+
+    expect(combinedText).not.toContain("LEVERAGE");
+    expect(combinedText).not.toContain("MARKET TIMING");
+    expect(combinedText).not.toContain("MARGIN");
+  });
+
   describe("scenario 2 input precedence", () => {
     const basePrompt =
       "Evaluate my portfolio against the current investment policy.\n\nGenerate a decision snapshot and recommendation.";
