@@ -197,6 +197,35 @@ describe("runDecision", () => {
     expect(result.snapshot.evaluation.risk_checks.notes).toContain("missing");
   });
 
+  it("defers when drawdown exceeds policy maximum (scenario 3)", async () => {
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate my portfolio against the current investment policy and generate a decision snapshot.",
+        },
+      ],
+      portfolio_state: {
+        as_of_date: "2026-02-04",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.55, BONDS: 0.35, CASH: 0.10 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
+      risk_inputs: {
+        rolling_12m_drawdown_pct: 0.3,
+        risk_capacity_breached: false,
+      },
+    });
+
+    expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
+    expect(result.snapshot.recommendation.proposed_actions).toEqual([]);
+    expect(result.snapshot.evaluation.risk_checks.drawdown_proximity).toContain("0.3");
+  });
+
   describe("scenario 2 input precedence", () => {
     const basePrompt =
       "Evaluate my portfolio against the current investment policy.\n\nGenerate a decision snapshot and recommendation.";
