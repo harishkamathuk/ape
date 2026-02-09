@@ -171,6 +171,32 @@ describe("runDecision", () => {
     expect(combinedText).not.toContain("MARGIN");
   });
 
+  it("defers when risk inputs are missing (scenario 2)", async () => {
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate my portfolio against the current investment policy. Generate a decision snapshot.",
+        },
+      ],
+      portfolio_state: {
+        as_of_date: "2026-02-04",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
+      // risk_inputs intentionally omitted
+    });
+
+    expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
+    expect(result.snapshot.recommendation.proposed_actions).toEqual([]);
+    expect(result.snapshot.evaluation.risk_checks.notes).toContain("missing");
+  });
+
   describe("scenario 2 input precedence", () => {
     const basePrompt =
       "Evaluate my portfolio against the current investment policy.\n\nGenerate a decision snapshot and recommendation.";
