@@ -204,6 +204,34 @@ describe("runDecision", () => {
     expect(result.snapshot.policy_items_referenced.length).toBeGreaterThan(0);
   });
 
+  it("policy provenance includes DPQ ids on an in-band, no-cash-flows decision", async () => {
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate my portfolio against the current investment policy and include policy provenance. Portfolio state: As of date 2026-02-07. Total value: £200,000. Weights: EQUITIES 80%, BONDS 15%, CASH 5%. No new contributions. No new withdrawals. Return a decision snapshot with referenced policy items.",
+        },
+      ],
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 200000,
+        weights: { EQUITIES: 0.8, BONDS: 0.15, CASH: 0.05 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
+      risk_inputs: defaultRiskInputs,
+    });
+
+    expect(result.snapshot.outcome_state).toBe("RECOMMEND_NO_ACTION");
+    expect(result.snapshot.policy_items_referenced.length).toBeGreaterThan(0);
+    expect(result.snapshot.policy_items_referenced[0].dpq_id).toMatch(/^DPQ-\d{3}$/);
+    expect(Array.isArray(result.snapshot.warnings)).toBe(true);
+    expect(Array.isArray(result.snapshot.errors)).toBe(true);
+  });
+
   it("recommends rebalance when drift is out of band and no cash flows (scenario 3)", async () => {
     const result = await runDecision({
       messages: [
