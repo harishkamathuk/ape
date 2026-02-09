@@ -177,6 +177,33 @@ describe("runDecision", () => {
     });
   });
 
+  it("scenario 2 (in-band, no cash flows) returns RECOMMEND_NO_ACTION", async () => {
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate my portfolio against the current investment policy. Portfolio state: As of date 2026-02-07. Total value: £100,000. Weights: EQUITIES 80%, BONDS 15%, CASH 5%. No new contributions. No new withdrawals. Generate a decision snapshot and recommendation.",
+        },
+      ],
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.8, BONDS: 0.15, CASH: 0.05 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
+      risk_inputs: defaultRiskInputs,
+    });
+
+    expect(result.snapshot.outcome_state).toBe("RECOMMEND_NO_ACTION");
+    expect(result.snapshot.recommendation.type).toBe("DO_NOTHING");
+    expect(result.snapshot.inputs_missing).toEqual([]);
+    expect(result.snapshot.policy_items_referenced.length).toBeGreaterThan(0);
+  });
+
   it("recommends rebalance when drift is out of band and no cash flows (scenario 3)", async () => {
     const result = await runDecision({
       messages: [
