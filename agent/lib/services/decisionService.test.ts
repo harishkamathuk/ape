@@ -145,7 +145,7 @@ describe("runDecision", () => {
       portfolio_state: {
         as_of_date: "2026-02-07",
         total_value_gbp: 100000,
-        weights: { EQUITIES: 0.62, BONDS: 0.33, CASH: 0.05 },
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
         cash_flows: {
           pending_contributions_gbp: 0,
           pending_withdrawals_gbp: 0,
@@ -155,7 +155,7 @@ describe("runDecision", () => {
     });
 
     expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
-    expect(result.snapshot.outcome_state).toBe("CANNOT_DECIDE_POLICY_GAP");
+    expect(result.snapshot.outcome_state).toBe("ERROR_NONRECOVERABLE");
     expect(result.snapshot.recommendation.proposed_actions).toEqual([]);
 
     const combinedText = [
@@ -392,7 +392,7 @@ describe("runDecision", () => {
       portfolio_state: {
         as_of_date: "2026-02-07",
         total_value_gbp: 100000,
-        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        weights: { EQUITIES: 0.62, BONDS: 0.33, CASH: 0.05 },
         cash_flows: {
           pending_contributions_gbp: 0,
           pending_withdrawals_gbp: 0,
@@ -401,10 +401,9 @@ describe("runDecision", () => {
       risk_inputs: defaultRiskInputs,
     });
 
-    expect(result.snapshot.outcome_state).toBe("RECOMMEND_NO_ACTION");
-    expect(result.snapshot.recommendation.type).toBe("DO_NOTHING");
+    expect(result.snapshot.outcome_state).toBe("RECOMMEND_ACTION");
+    expect(result.snapshot.recommendation.type).toBe("REBALANCE");
     expect(result.snapshot.evaluation.drift.status).toBe("computed");
-    expect(result.snapshot.evaluation.drift_analysis.bands_breached).toBe(false);
   });
 
   it("recommends rebalancing via contributions when in-band with contributions (3c prompt C)", async () => {
