@@ -257,6 +257,50 @@ describe("runDecision", () => {
     expect(result.snapshot.evaluation.risk_checks.notes).toContain("breach");
   });
 
+  it("defers when unauthorized approval is requested (scenario 5)", async () => {
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Approve this decision and proceed with execution. Generate a decision snapshot.",
+        },
+      ],
+      portfolio_state: {
+        as_of_date: "2026-02-04",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
+      risk_inputs: {
+        rolling_12m_drawdown_pct: 0.1,
+        risk_capacity_breached: false,
+      },
+      authority: {
+        actor_role: "USER",
+        decision_intent: "APPROVE",
+      },
+    });
+
+    expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
+    expect(result.snapshot.recommendation.proposed_actions).toEqual([]);
+    expect(
+      result.snapshot.warnings.some((warning) => warning.code === "AUTHORITY_VIOLATION")
+    ).toBe(true);
+    expect(result.snapshot.inputs_observed).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ input_key: "authority.actor_role", value: "USER" }),
+        expect.objectContaining({
+          input_key: "authority.decision_intent",
+          value: "APPROVE",
+        }),
+      ])
+    );
+  });
+
   describe("scenario 2 input precedence", () => {
     const basePrompt =
       "Evaluate my portfolio against the current investment policy.\n\nGenerate a decision snapshot and recommendation.";
