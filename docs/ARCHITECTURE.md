@@ -19,13 +19,11 @@
 ## High-level Components
 > Describe responsibility boundaries, not code structure.
 
-- **UI / Client:** Collects chat + structured `portfolio_state`, renders chat as supportive UX, and treats Decision Snapshot as authoritative output.
+- **UI / Client:** Dashboard-first lifecycle routing is the primary UX; chat remains available for governed decision support and treats Decision Snapshot as authoritative output.
 - **API / Service layer:** `POST /api/chat` validates request shape, orchestrates decision flow, applies guardrails, and emits snapshot.
 - **User context (platform):** User identity is resolved only via `UserContextProvider`; domain/business logic must be user-scoped and must not read env/auth inputs directly.
 - **Policy state repository (platform/data):** User-scoped policy lifecycle artifacts are persisted behind `PolicyStateRepository` (MVP `JsonPolicyStateRepository`) with storage root configured by `POLICY_STATE_DIR`.
-- **Data store(s):** File-based policy/config artifacts (`artifacts/policy/default/*`, optional `artifacts/local/*`) are source of truth; no DB through Milestone 3c.
-At runtime, policy must be provided via explicit configuration; repo artifacts are not valid runtime dependencies.
-Policy follows a two-layer model: an immutable, release-scoped governance bundle (policy JSON + Prime Directive markdown) is baked into the build/image and loaded in production via `POLICY_DIR` (for example, `/app/policy`), while a versioned, data-scoped user policy instance is derived from questionnaire outputs and used to set SAA (rare updates) with regular TAA overlays constrained by governance guardrails.
+- **Data store(s):** Policy is version-controlled in `artifacts/policy/default/*` (with optional local authoring overrides in `artifacts/local/*`) as the authoring source of truth; no DB through Milestone 3c. Production runtime must consume the immutable, release-baked governance bundle (policy JSON + Prime Directive markdown) via `POLICY_DIR` (for example, `/app/policy`) and must not read repo artifacts as runtime dependencies. User policy lifecycle state remains versioned/data-scoped and persisted via `PolicyStateRepository`.
 - **Integrations:** LLM generation via Mastra agent abstraction; policy and explanation contract loaded from artifacts.
 - **Jobs / schedulers (if any):** None in current scope.
 
@@ -36,6 +34,8 @@ Policy follows a two-layer model: an immutable, release-scoped governance bundle
 - Retention / archival assumptions: snapshots are returned per request only; policy lifecycle state persists as user-scoped repository records.
 
 ## Core Flows
+Lifecycle ordering is explicit: IPS -> Risk Profile -> Portfolio Guidelines -> Executable Policy. Portfolio Guidelines must not be created during IPS setup.
+
 ### Flow A — Governed decision with structured state
 1. UI sends chat history plus optional structured `portfolio_state` to `POST /api/chat`.
 2. Service loads policy, validates/coerces state (with safe fallback path), computes deterministic drift/risk context.
@@ -57,6 +57,7 @@ Policy follows a two-layer model: an immutable, release-scoped governance bundle
 - `recommendation.type` must remain within the closed enum.
 - Unsafe/invalid model outputs must degrade to safe recommendation types, not silent success.
 - Filesystem access for policy lifecycle persistence is confined to `JsonPolicyStateRepository` implementation boundaries.
+- If portfolio_state exists, the system must never request weights.
 
 ## Observability (minimum)
 - Logs: server logs for policy provenance, fallback reasons, guardrail/explanation warnings; client debug logging gated by log level.
@@ -67,7 +68,7 @@ Policy follows a two-layer model: an immutable, release-scoped governance bundle
 - AuthN: none implemented for local MVP surface.
 - AuthZ: authority intent and risk guardrails enforced in decision layer; no execution authority exists.
 - Secrets management: provider API keys loaded from environment (`.env` / container env file).
-- Data sensitivity notes: portfolio inputs are user-provided financial context; avoid logging secrets and keep artifacts local by default.
+- Data sensitivity notes: portfolio inputs are user-provided financial context; avoid logging secrets and keep policy bundles local by default in dev while production uses a release-baked bundle.
 
 ## External Interfaces
 - Public endpoints: `POST /api/chat`.
