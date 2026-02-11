@@ -2,6 +2,7 @@ name: Commit Prefix Check
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened]
 
 jobs:
   branch-name:
@@ -16,22 +17,22 @@ jobs:
           echo "Validating branch: $branch"
           echo "$branch" | grep -Eq "$regex" || {
             cat <<'EOF'
-Branch name is invalid.
+            Branch name is invalid.
 
-Required format:
-  <type>/APE<id>-<description>
-  <type>/APE-<id>-<description>
+            Required format:
+              <type>/APE<id>-<description>
+              <type>/APE-<id>-<description>
 
-Rules:
-  - <type> must be one of: feat, fix, chore, docs, refactor, test, ci, build, perf, style, hotfix
-  - <id> must be 1 to 3 digits
-  - <description> must be lowercase kebab-case
+            Rules:
+              - <type> must be one of: feat, fix, chore, docs, refactor, test, ci, build, perf, style, hotfix
+              - <id> must be 1 to 3 digits
+              - <description> must be lowercase kebab-case
 
-Examples:
-  feat/APE1-plane-sync
-  chore/APE-11-update-workflow
-  docs/APE-111-add-setup-guide
-EOF
+            Examples:
+              feat/APE1-plane-sync
+              chore/APE-11-update-workflow
+              docs/APE-111-add-setup-guide
+            EOF
             exit 1
           }
 
