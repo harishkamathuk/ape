@@ -24,13 +24,13 @@
 - **User context (platform):** User identity is resolved only via `UserContextProvider`; domain/business logic must be user-scoped and must not read env/auth inputs directly.
 - **Policy state repository (platform/data):** User-scoped policy lifecycle artifacts are persisted behind `PolicyStateRepository` (MVP `JsonPolicyStateRepository`) with storage root configured by `POLICY_STATE_DIR`.
 - **Data store(s):** Policy is version-controlled in `artifacts/policy/default/*` (with optional local authoring overrides in `artifacts/local/*`) as the authoring source of truth; no DB through Milestone 3c. Production runtime must consume the immutable, release-baked governance bundle (policy JSON + Prime Directive markdown) via `POLICY_DIR` (for example, `/app/policy`) and must not read repo artifacts as runtime dependencies. User policy lifecycle state remains versioned/data-scoped and persisted via `PolicyStateRepository`.
-- **Integrations:** LLM generation via Mastra agent abstraction; policy and explanation contract loaded from artifacts.
+- **Integrations:** LLM generation via Mastra agent abstraction; runtime policy/explanation contract loaded from the `POLICY_DIR` governance bundle (artifacts remain authoring source).
 - **Jobs / schedulers (if any):** None in current scope.
 
 ## Data Model (at a glance)
 - Core entities: `ChatRequest`, `PortfolioStateInput`, `PolicyJson`, `DecisionSnapshot`.
 - Key identifiers: `snapshot_id`, `policy_id`, `policy_version`.
-- Ownership / source of truth: deterministic evaluation fields owned by service logic + policy artifacts; recommendation/explanation text proposed by model then constrained by guardrails.
+- Ownership / source of truth: deterministic evaluation fields owned by service logic + runtime governance bundle (from `POLICY_DIR`, authored in artifacts); recommendation/explanation text proposed by model then constrained by guardrails.
 - Retention / archival assumptions: snapshots are returned per request only; policy lifecycle state persists as user-scoped repository records.
 
 ## Core Flows
@@ -78,3 +78,4 @@ Lifecycle ordering is explicit: IPS -> Risk Profile -> Portfolio Guidelines -> E
 ## Links
 - Decision log: `docs/decisions/`
 - Change log: `docs/CHANGELOG.md`
+
