@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { DecisionSnapshot } from "@/lib/domain/decisionSnapshot";
 import { runDecision } from "@/lib/services/decisionService";
 
 let forcedResponse: string | null = null;
@@ -90,6 +91,48 @@ const defaultRiskInputs = {
   rolling_12m_drawdown_pct: 0.1,
   risk_capacity_breached: false,
 };
+
+const EVIDENCE_ENABLED = process.env.APE_EVIDENCE === "1";
+
+function emitEvidenceSnapshot(label: string, snapshot: DecisionSnapshot): void {
+  if (!EVIDENCE_ENABLED) return;
+
+  const excerpt = {
+    outcome_state: snapshot.outcome_state,
+    recommendation: {
+      type: snapshot.recommendation.type,
+    },
+    governance: {
+      investment_policy: snapshot.governance.investment_policy,
+    },
+    evaluation: {
+      policy_applied: {
+        status: snapshot.evaluation.policy_applied.status,
+        risk_guardrails_used: snapshot.evaluation.policy_applied.risk_guardrails_used,
+        evaluated_policies: snapshot.evaluation.policy_applied.evaluated_policies,
+      },
+      risk_checks: snapshot.evaluation.risk_checks,
+    },
+    inputs_observed: snapshot.inputs_observed.filter(
+      (item) =>
+        item.input_key.startsWith("risk_inputs.") || item.input_key.startsWith("authority.")
+    ),
+    policy_items_referenced: snapshot.policy_items_referenced.filter(
+      (item) => item.dpq_id === "DPQ-001" || item.dpq_id === "DPQ-004"
+    ),
+    warnings: snapshot.warnings.filter(
+      (item) =>
+        item.code === "AUTHORITY_VIOLATION" ||
+        item.code === "POLICY_GAP_RISK_GUARDRAILS" ||
+        item.code === "DRIFT_CANNOT_COMPUTE"
+    ),
+    errors: snapshot.errors,
+  };
+
+  console.log(`APE_EVIDENCE_BEGIN ${label}`);
+  console.log(JSON.stringify(excerpt, null, 2));
+  console.log(`APE_EVIDENCE_END ${label}`);
+}
 
 describe("runDecision", () => {
   it("asks for clarification when portfolio state is missing (scenario 1)", async () => {
@@ -221,6 +264,8 @@ describe("runDecision", () => {
       },
     });
 
+    emitEvidenceSnapshot("scenario-3-drawdown-breach", result.snapshot);
+
     expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
     expect(result.snapshot.recommendation.proposed_actions).toEqual([]);
     expect(result.snapshot.evaluation.risk_checks.drawdown_proximity).toContain("0.3");
@@ -250,6 +295,8 @@ describe("runDecision", () => {
         risk_capacity_breached: true,
       },
     });
+
+    emitEvidenceSnapshot("scenario-4-risk-capacity-breach", result.snapshot);
 
     expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
     expect(result.snapshot.recommendation.proposed_actions).toEqual([]);
@@ -284,6 +331,8 @@ describe("runDecision", () => {
         decision_intent: "APPROVE",
       },
     });
+
+    emitEvidenceSnapshot("scenario-5-unauthorized-approval-execution", result.snapshot);
 
     expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
     expect(result.snapshot.recommendation.proposed_actions).toEqual([]);
