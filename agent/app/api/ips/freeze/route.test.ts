@@ -85,10 +85,11 @@ describe("POST /api/ips/freeze", () => {
   });
 
   it("returns 200 idempotent success when IPS is already frozen", async () => {
+    const frozenIps = createIps({ status: "FROZEN" });
     const policyRepo = createPolicyRepo({
       getPolicyState: vi.fn(async () => ({
         userId: "u123",
-        ips: createIps({ status: "FROZEN" }),
+        ips: frozenIps,
       })),
     });
     const handler = createPostHandler({
@@ -101,6 +102,37 @@ describe("POST /api/ips/freeze", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ status: "FROZEN" });
     expect(policyRepo.upsertIps).not.toHaveBeenCalled();
+    expect(frozenIps.status).toBe("FROZEN");
+  });
+
+  it("treats empty JSON object body as no-args command input", async () => {
+    const draftIps = createIps({ status: "DRAFT" });
+    const policyRepo = createPolicyRepo({
+      getPolicyState: vi.fn(async () => ({
+        userId: "u123",
+        ips: draftIps,
+      })),
+    });
+    const handler = createPostHandler({
+      userProvider: createUserProvider("u123"),
+      policyRepo,
+    });
+
+    const response = await handler(
+      new Request("http://localhost/api/ips/freeze", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ status: "FROZEN" });
+    expect(policyRepo.upsertIps).toHaveBeenCalledTimes(1);
+    expect(policyRepo.upsertIps).toHaveBeenCalledWith("u123", {
+      ...draftIps,
+      status: "FROZEN",
+    });
   });
 
   it("returns 401 when user context is unavailable", async () => {
@@ -162,7 +194,7 @@ describe("POST /api/ips/freeze", () => {
       new Request("http://localhost/api/ips/freeze", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ status: "FROZEN" }),
+        body: JSON.stringify({ foo: "bar" }),
       }),
     );
 
@@ -172,11 +204,34 @@ describe("POST /api/ips/freeze", () => {
         code: "BAD_REQUEST",
         message: "Request body contains unsupported fields.",
         details: {
-          unknownFields: ["status"],
+          unknownFields: ["foo"],
         },
       },
     });
     expect(policyRepo.getPolicyState).not.toHaveBeenCalled();
+    expect(policyRepo.upsertIps).not.toHaveBeenCalled();
+  });
+
+  it("returns 409 when policy state exists but IPS is missing", async () => {
+    const policyRepo = createPolicyRepo({
+      getPolicyState: vi.fn(async () => ({
+        userId: "u123",
+      })),
+    });
+    const handler = createPostHandler({
+      userProvider: createUserProvider("u123"),
+      policyRepo,
+    });
+
+    const response = await handler(new Request("http://localhost/api/ips/freeze", { method: "POST" }));
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "CONFLICT",
+        message: "No IPS draft exists to freeze.",
+      },
+    });
     expect(policyRepo.upsertIps).not.toHaveBeenCalled();
   });
 
