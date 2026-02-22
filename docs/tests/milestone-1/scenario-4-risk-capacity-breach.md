@@ -64,7 +64,7 @@ Prove the canonical decision boundary defers when `risk_capacity_breached` is tr
 
 ## Evidence Reference
 
-- Commit hash: `PENDING_COMMIT_HASH`
+- Commit hash: `d4270462a2af0a5e4050e889836ca65a29439c1a`
 - Test output source: terminal output from the invocation above (captured inline from `APE_EVIDENCE_BEGIN scenario-4-risk-capacity-breach` ... `APE_EVIDENCE_END scenario-4-risk-capacity-breach`)
 
 ## Notes
