@@ -16,7 +16,7 @@
 
 import crypto from "node:crypto";
 
-import type { ChatRequest } from "@/lib/domain/chat";
+import type { DecisionRequest } from "@/lib/domain/decision";
 import type {
   DecisionSnapshot,
   OutcomeState,
@@ -69,13 +69,13 @@ function findPolicyItem(dpqId: string): PolicyItemReference | null {
   return match ?? null;
 }
 
-function extractLastUserMessage(messages: ChatRequest["messages"]): string | null {
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    if (messages[i]?.role === "user" && typeof messages[i]?.content === "string") {
-      return messages[i].content;
-    }
+function extractDecisionNote(requestNote: DecisionRequest["request_note"]): string | null {
+  if (typeof requestNote !== "string") {
+    return null;
   }
-  return null;
+
+  const trimmed = requestNote.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 function parseNumber(raw: string): number | null {
@@ -408,11 +408,11 @@ function buildCorrectnessEvaluation(args: {
 /**
  * Main entry point for decision generation.
  */
-export async function runDecision(req: ChatRequest): Promise<{ snapshot: DecisionSnapshot }> {
+export async function runDecision(req: DecisionRequest): Promise<{ snapshot: DecisionSnapshot }> {
   const snapshotId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
 
-  if (!Array.isArray(req.messages)) {
+  if (req.request_note !== undefined && typeof req.request_note !== "string") {
     const errorSnapshot: DecisionSnapshot = {
       snapshot_id: snapshotId,
       snapshot_version: SNAPSHOT_VERSION,
@@ -434,8 +434,8 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
       errors: [
         {
           code: "INVALID_REQUEST",
-          message: "messages must be an array",
-          fields: ["messages"],
+          message: "request_note must be a string when provided",
+          fields: ["request_note"],
         },
       ],
       context: {
@@ -516,7 +516,7 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
         },
       },
       explanation: {
-        decision_summary: "Invalid request; missing messages array.",
+        decision_summary: "Invalid request; request_note must be a string when provided.",
         relevant_portfolio_state: "No portfolio state.",
         policy_basis: "Policy unavailable due to invalid request.",
         reasoning_and_tradeoffs: "Cannot evaluate without a valid request payload.",
@@ -558,8 +558,8 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
    * Structured + prompt-derived portfolio state (optional)
    * ------------------------------------------------------------------
    */
-  const lastUserMessage = extractLastUserMessage(req.messages);
-  const parsedState = lastUserMessage ? extractPortfolioStateFromPrompt(lastUserMessage) : null;
+  const requestNote = extractDecisionNote(req.request_note);
+  const parsedState = requestNote ? extractPortfolioStateFromPrompt(requestNote) : null;
   const hasPortfolioStateProvided =
     !!req.portfolio_state && !isEmptyState(req.portfolio_state);
   const structuredState =
@@ -737,7 +737,7 @@ Portfolio state has NOT been provided.
    * ------------------------------------------------------------------
    */
   const rawResponse = await generateAssistantReply({
-    messages: req.messages,
+    messages: requestNote ? [{ role: "user", content: requestNote }] : [],
     systemPrompt: prompt,
   });
 
@@ -1136,7 +1136,7 @@ Portfolio state has NOT been provided.
       },
       market_context: {
         as_of_date: state?.as_of_date ?? new Date().toISOString().slice(0, 10),
-        notes: "No exceptional market context assumed.",
+        notes: requestNote ?? "No exceptional market context assumed.",
       },
     },
 

@@ -82,14 +82,14 @@ function assertSnapshotContract(snapshot: DecisionSnapshot): void {
 describe("Decision Snapshot contract (M3a)", () => {
   it("always returns a snapshot with outcome_state", async () => {
     const result = await runDecision({
-      messages: [{ role: "user", content: "Evaluate my portfolio." }],
+      request_note: "Evaluate my portfolio.",
     });
     expect(result.snapshot.outcome_state).toBeTruthy();
   });
 
   it("missing inputs outcome includes inputs_missing entries", async () => {
     const result = await runDecision({
-      messages: [{ role: "user", content: "Evaluate my portfolio." }],
+      request_note: "Evaluate my portfolio.",
     });
 
     expect(result.snapshot.outcome_state).toBe("CANNOT_DECIDE_MISSING_INPUTS");
@@ -102,13 +102,8 @@ describe("Decision Snapshot contract (M3a)", () => {
 
   it("policy_items_referenced includes at least one DPQ id on a normal path", async () => {
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content:
-            "Evaluate my portfolio. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No cash flows.",
-        },
-      ],
+      request_note:
+        "Evaluate my portfolio. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No cash flows.",
       risk_inputs: { rolling_12m_drawdown_pct: 0.1, risk_capacity_breached: false },
     });
 
@@ -118,7 +113,7 @@ describe("Decision Snapshot contract (M3a)", () => {
 
   it("warnings/errors are arrays of structured objects", async () => {
     const result = await runDecision({
-      messages: [{ role: "user", content: "Evaluate my portfolio." }],
+      request_note: "Evaluate my portfolio.",
     });
 
     assertSnapshotContract(result.snapshot);

@@ -71,12 +71,7 @@ describe("Decision Snapshot contract (M3b)", () => {
 
   it("populates policy_applied and drift evaluation for a full apply pass", async () => {
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content: "Evaluate my portfolio and generate a decision snapshot.",
-        },
-      ],
+      request_note: "Evaluate my portfolio and generate a decision snapshot.",
       portfolio_state: {
         as_of_date: "2026-02-07",
         total_value_gbp: 100000,
@@ -116,7 +111,7 @@ describe("Decision Snapshot contract (M3b)", () => {
 
   it("does not request weights when portfolio_state exists but weights are missing", async () => {
     const result = await runDecision({
-      messages: [{ role: "user", content: "Evaluate my portfolio." }],
+      request_note: "Evaluate my portfolio.",
       portfolio_state: {
         as_of_date: "2026-02-07",
         total_value_gbp: 100000,
@@ -136,12 +131,7 @@ describe("Decision Snapshot contract (M3b)", () => {
     mockModelResponse({ ...baseModel, recommendation_type: "REBALANCE" });
 
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content: "Evaluate my portfolio and generate a decision snapshot.",
-        },
-      ],
+      request_note: "Evaluate my portfolio and generate a decision snapshot.",
       portfolio_state: {
         as_of_date: "2026-02-07",
         total_value_gbp: 100000,
@@ -177,7 +167,7 @@ describe("Decision Snapshot contract (M3b)", () => {
 
   it("marks drift as not_applicable when no portfolio_state is provided", async () => {
     const result = await runDecision({
-      messages: [{ role: "user", content: "Evaluate my portfolio." }],
+      request_note: "Evaluate my portfolio.",
     });
 
     expect(result.snapshot.evaluation.drift.status).toBe("not_applicable");
