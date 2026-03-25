@@ -107,6 +107,15 @@ describe("Decision Snapshot contract (M3b)", () => {
       risk_inputs: true,
       authority: true,
     });
+    expect(
+      result.snapshot.inputs_observed.filter((item) => item.input_key.startsWith("portfolio_state."))
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ input_key: "portfolio_state.weights", source: "request" }),
+        expect.objectContaining({ input_key: "portfolio_state.cash_flows", source: "request" }),
+        expect.objectContaining({ input_key: "portfolio_state.total_value", source: "request" }),
+      ]),
+    );
   });
 
   it("does not request weights when portfolio_state exists but weights are missing", async () => {
@@ -167,7 +176,8 @@ describe("Decision Snapshot contract (M3b)", () => {
 
   it("marks drift as not_applicable when no portfolio_state is provided", async () => {
     const result = await runDecision({
-      request_note: "Evaluate my portfolio.",
+      request_note:
+        "Evaluate my portfolio. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No cash flows.",
     });
 
     expect(result.snapshot.evaluation.drift.status).toBe("not_applicable");
@@ -184,5 +194,8 @@ describe("Decision Snapshot contract (M3b)", () => {
     expect(result.snapshot.inputs_provenance.authority).not.toBeNull();
     expect(typeof result.snapshot.inputs_evaluated.risk_inputs).toBe("boolean");
     expect(typeof result.snapshot.inputs_evaluated.authority).toBe("boolean");
+    expect(
+      result.snapshot.inputs_observed.some((item) => item.input_key.startsWith("portfolio_state."))
+    ).toBe(false);
   });
 });

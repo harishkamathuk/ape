@@ -40,7 +40,6 @@ import {
 } from "@/lib/services/guardrails";
 
 const SNAPSHOT_VERSION = "0.3";
-const EPS = 1e-6;
 
 const DPQ_AUTHORITY = "DPQ-001";
 const DPQ_DRIFT = "DPQ-002";
@@ -76,87 +75,6 @@ function extractDecisionNote(requestNote: DecisionRequest["request_note"]): stri
 
   const trimmed = requestNote.trim();
   return trimmed.length > 0 ? trimmed : null;
-}
-
-function parseNumber(raw: string): number | null {
-  const cleaned = raw.replace(/,/g, "").trim();
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
-}
-
-function parseWeight(value: number, hasPercent: boolean): number {
-  if (hasPercent || value > 1) {
-    return value / 100;
-  }
-  return value;
-}
-
-function extractPortfolioStateFromPrompt(content: string): PortfolioStateInput | null {
-  const eqMatch = /equities[^0-9]*([0-9]+(?:\.[0-9]+)?)\s*(%?)/i.exec(content);
-  const bdMatch = /bonds?[^0-9]*([0-9]+(?:\.[0-9]+)?)\s*(%?)/i.exec(content);
-  const csMatch = /cash[^0-9]*([0-9]+(?:\.[0-9]+)?)\s*(%?)/i.exec(content);
-
-  if (!eqMatch || !bdMatch || !csMatch) {
-    return null;
-  }
-
-  const eqRaw = parseNumber(eqMatch[1]);
-  const bdRaw = parseNumber(bdMatch[1]);
-  const csRaw = parseNumber(csMatch[1]);
-  if (eqRaw === null || bdRaw === null || csRaw === null) {
-    return null;
-  }
-
-  const weights = {
-    EQUITIES: parseWeight(eqRaw, eqMatch[2] === "%"),
-    BONDS: parseWeight(bdRaw, bdMatch[2] === "%"),
-    CASH: parseWeight(csRaw, csMatch[2] === "%"),
-  };
-
-  const totalMatch = /total\s*value[^0-9]*([0-9,]+(?:\.[0-9]+)?)/i.exec(content);
-  const total_value_gbp = totalMatch ? parseNumber(totalMatch[1]) : null;
-
-  let pending_contributions_gbp: number | null = null;
-  let pending_withdrawals_gbp: number | null = null;
-  if (/no\s+new\s+contributions?/i.test(content)) {
-    pending_contributions_gbp = 0;
-  } else {
-    const contribMatch = /contributions?[^0-9]*([0-9,]+(?:\.[0-9]+)?)/i.exec(content);
-    if (contribMatch) pending_contributions_gbp = parseNumber(contribMatch[1]);
-  }
-  if (/no\s+new\s+withdrawals?/i.test(content)) {
-    pending_withdrawals_gbp = 0;
-  } else {
-    const wdMatch = /withdrawals?[^0-9]*([0-9,]+(?:\.[0-9]+)?)/i.exec(content);
-    if (wdMatch) pending_withdrawals_gbp = parseNumber(wdMatch[1]);
-  }
-
-  return {
-    as_of_date: new Date().toISOString().slice(0, 10),
-    total_value_gbp,
-    weights,
-    cash_flows: {
-      pending_contributions_gbp,
-      pending_withdrawals_gbp,
-    },
-  };
-}
-
-function statesDiffer(a: PortfolioStateInput, b: PortfolioStateInput): boolean {
-  const diffWeight =
-    Math.abs((a.weights.EQUITIES ?? 0) - (b.weights.EQUITIES ?? 0)) > EPS ||
-    Math.abs((a.weights.BONDS ?? 0) - (b.weights.BONDS ?? 0)) > EPS ||
-    Math.abs((a.weights.CASH ?? 0) - (b.weights.CASH ?? 0)) > EPS;
-
-  const diffTotal = (a.total_value_gbp ?? null) !== (b.total_value_gbp ?? null);
-  const diffContrib =
-    (a.cash_flows.pending_contributions_gbp ?? null) !==
-    (b.cash_flows.pending_contributions_gbp ?? null);
-  const diffWd =
-    (a.cash_flows.pending_withdrawals_gbp ?? null) !==
-    (b.cash_flows.pending_withdrawals_gbp ?? null);
-
-  return diffWeight || diffTotal || diffContrib || diffWd;
 }
 
 function isEmptyState(state: PortfolioStateInput): boolean {
@@ -555,11 +473,10 @@ export async function runDecision(req: DecisionRequest): Promise<{ snapshot: Dec
 
   /**
    * ------------------------------------------------------------------
-   * Structured + prompt-derived portfolio state (optional)
+   * Typed decision inputs (authoritative)
    * ------------------------------------------------------------------
    */
   const requestNote = extractDecisionNote(req.request_note);
-  const parsedState = requestNote ? extractPortfolioStateFromPrompt(requestNote) : null;
   const hasPortfolioStateProvided =
     !!req.portfolio_state && !isEmptyState(req.portfolio_state);
   const structuredState =
@@ -574,23 +491,7 @@ export async function runDecision(req: DecisionRequest): Promise<{ snapshot: Dec
     console.log("[APE] Form state empty or incomplete:", describeFormState(req.portfolio_state));
   }
 
-  const hasConflict =
-    !!parsedState && !!structuredState && statesDiffer(parsedState, structuredState);
-  if (hasConflict) {
-    const warning =
-      "Prompt portfolio state conflicts with the form values. Please confirm the correct inputs.";
-    auditWarnings.push(warning);
-    console.warn("[APE] Prompt/form conflict:", warning);
-  } else if (parsedState && !req.portfolio_state) {
-    const warning = "Using prompt-derived portfolio state.";
-    auditWarnings.push(warning);
-    console.log("[APE] Prompt-derived state:", warning);
-  }
-
-  // If there's a conflict, treat the state as missing to force clarification.
-  const state: PortfolioStateInput | null = hasConflict
-    ? null
-    : structuredState ?? parsedState ?? null;
+  const state: PortfolioStateInput | null = structuredState;
 
   const authority: AuthorityContext = req.authority ?? {
     actor_role: "USER",
@@ -611,11 +512,9 @@ export async function runDecision(req: DecisionRequest): Promise<{ snapshot: Dec
   const hasCashFlows = (pendingContrib ?? 0) > 0 || (pendingWithdraw ?? 0) > 0;
 
   const baseRecommendationType: RecommendationType = !state
-    ? hasConflict
-      ? "ASK_CLARIFYING_QUESTIONS"
-      : hasPortfolioStateProvided
-        ? "DEFER_AND_REVIEW"
-        : "ASK_CLARIFYING_QUESTIONS"
+    ? hasPortfolioStateProvided
+      ? "DEFER_AND_REVIEW"
+      : "ASK_CLARIFYING_QUESTIONS"
     : !driftResult
       ? "DEFER_AND_REVIEW"
       : hasCashFlows
@@ -1002,15 +901,9 @@ Portfolio state has NOT been provided.
   const inputsObserved = [
     ...(state
       ? [
-          { input_key: "portfolio_state.weights", value: "provided", source: "form" as const },
-          { input_key: "portfolio_state.cash_flows", value: "provided", source: "form" as const },
-          { input_key: "portfolio_state.total_value", value: state.total_value_gbp, source: "form" as const },
-        ]
-      : []),
-    ...(parsedState && !state
-      ? [
-          { input_key: "portfolio_state.weights", value: "provided", source: "prompt" as const },
-          { input_key: "portfolio_state.cash_flows", value: "provided", source: "prompt" as const },
+          { input_key: "portfolio_state.weights", value: "provided", source: "request" as const },
+          { input_key: "portfolio_state.cash_flows", value: "provided", source: "request" as const },
+          { input_key: "portfolio_state.total_value", value: state.total_value_gbp, source: "request" as const },
         ]
       : []),
     ...(riskInputs

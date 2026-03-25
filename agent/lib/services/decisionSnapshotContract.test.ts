@@ -89,7 +89,8 @@ describe("Decision Snapshot contract (M3a)", () => {
 
   it("missing inputs outcome includes inputs_missing entries", async () => {
     const result = await runDecision({
-      request_note: "Evaluate my portfolio.",
+      request_note:
+        "Evaluate my portfolio. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No cash flows.",
     });
 
     expect(result.snapshot.outcome_state).toBe("CANNOT_DECIDE_MISSING_INPUTS");
@@ -104,11 +105,33 @@ describe("Decision Snapshot contract (M3a)", () => {
     const result = await runDecision({
       request_note:
         "Evaluate my portfolio. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No cash flows.",
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
       risk_inputs: { rolling_12m_drawdown_pct: 0.1, risk_capacity_breached: false },
     });
 
     expect(result.snapshot.policy_items_referenced.length).toBeGreaterThan(0);
     expect(result.snapshot.policy_items_referenced[0]?.dpq_id).toMatch(/^DPQ-\d{3}$/);
+  });
+
+  it("does not record prompt-derived portfolio observations from request_note prose", async () => {
+    const result = await runDecision({
+      request_note:
+        "Evaluate my portfolio. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No cash flows.",
+      risk_inputs: { rolling_12m_drawdown_pct: 0.1, risk_capacity_breached: false },
+    });
+
+    expect(result.snapshot.outcome_state).toBe("CANNOT_DECIDE_MISSING_INPUTS");
+    expect(
+      result.snapshot.inputs_observed.some((item) => item.input_key.startsWith("portfolio_state."))
+    ).toBe(false);
   });
 
   it("warnings/errors are arrays of structured objects", async () => {

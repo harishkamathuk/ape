@@ -26,7 +26,7 @@
 > Describe responsibility boundaries, not code structure.
 
 - **UI / Client:** Dashboard-first lifecycle routing is the primary UX; `/decisions` is the authoritative decision trigger surface and renders the Decision Snapshot as the authoritative output.
-- **API / Service layer:** `POST /api/decisions` validates decision-native request shape, orchestrates decision flow, applies guardrails, and emits snapshot.
+- **API / Service layer:** `POST /api/decisions` validates decision-native request shape, orchestrates decision flow, applies guardrails, and emits snapshot. Typed fields are authoritative for decision execution; `request_note` is narrative only.
 - **User context (platform):** User identity is resolved only via `UserContextProvider`; domain/business logic must be user-scoped and must not read env/auth inputs directly.
 - **Policy state repository (platform/data):** User-scoped policy lifecycle artifacts are persisted behind `PolicyStateRepository` (MVP `JsonPolicyStateRepository`) with storage root configured by `POLICY_STATE_DIR`.
 - **Data store(s):** Policy is version-controlled in `artifacts/policy/default/*` (with optional local authoring overrides in `artifacts/local/*`) as the authoring source of truth; no DB through Milestone 3c. Production runtime must consume the immutable, release-baked governance bundle (policy JSON + Prime Directive markdown) via `POLICY_DIR` (for example, `/app/policy`) and must not read repo artifacts as runtime dependencies. User policy lifecycle state remains versioned/data-scoped and persisted via `PolicyStateRepository`.
@@ -106,7 +106,7 @@ NOTE: Do not duplicate this content in other docs. ARCHITECTURE is authoritative
 
 ### Flow A — Governed decision with structured state
 1. UI sends a decision request plus optional structured `portfolio_state` to `POST /api/decisions`.
-2. Service loads policy, validates/coerces state (with safe fallback path), computes deterministic drift/risk context.
+2. Service loads policy, validates typed inputs (with safe fallback path), computes deterministic drift/risk context, and does not derive decision-driving inputs from freeform note text.
 3. LLM proposes recommendation/explanation JSON; guardrails + explanation contract enforce policy and snapshot is returned.
 
 ### Flow B — Missing or invalid state safety path
@@ -128,6 +128,7 @@ NOTE: Do not duplicate this content in other docs. ARCHITECTURE is authoritative
 - If portfolio_state exists, the system must never request weights.
 - When `portfolio_state.weights` are provided, values are decimals (0-1); incomplete/missing weights must trigger a safe path rather than 500.
 - Expected validation/model failures must return safe snapshot outcomes and should not surface as HTTP 500.
+- `request_note` may contribute narrative context only; it must never populate, override, or reconcile `portfolio_state`.
 
 ## Observability (minimum)
 - Logs: server logs for policy provenance, fallback reasons, guardrail/explanation warnings; client debug logging gated by log level.
@@ -154,6 +155,7 @@ NOTE: Do not duplicate this content in other docs. ARCHITECTURE is authoritative
 
 ## Governance Inputs at Decision Boundary
 - Decision Boundary (in this repo): the canonical invocation point that mints a Decision Snapshot (test harness / canonical decision entrypoint), not UI surfaces.
+- Decision requests are typed-input authoritative: `portfolio_state`, `risk_inputs`, and `authority` are the only decision-driving inputs. `request_note` is narrative context only.
 - Mode A (Allowed today) - Boundary-supplied:
   - Observed governance inputs at the boundary (request payload / invocation args source of truth): `risk_inputs`, `risk_inputs.rolling_12m_drawdown_pct`, `risk_inputs.risk_capacity_breached`, `authority`, `authority.actor_role`, `authority.decision_intent`.
   - Current implementation records supplied governance inputs in snapshot `inputs_observed[]` entries with `source: "request"`.

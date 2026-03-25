@@ -290,7 +290,7 @@ describe("runDecision", () => {
 
     const conflictFormState = {
       ...formState,
-      weights: { EQUITIES: 0.73, BONDS: 0.20, CASH: 0.07 },
+      weights: { EQUITIES: 0.76, BONDS: 0.18, CASH: 0.06 },
     };
 
     it.each([
@@ -309,21 +309,21 @@ describe("runDecision", () => {
         expected: "DO_NOTHING",
       },
       {
-        name: "Case C — prompt only",
+        name: "Case C — request note alone cannot supply portfolio_state",
         request: {
           request_note: promptWithWeights,
           risk_inputs: defaultRiskInputs,
         },
-        expected: "DO_NOTHING",
+        expected: "ASK_CLARIFYING_QUESTIONS",
       },
       {
-        name: "Case D — conflict between form and prompt",
+        name: "Case D — conflicting request note does not override typed state",
         request: {
           request_note: promptWithWeights,
           portfolio_state: conflictFormState,
           risk_inputs: defaultRiskInputs,
         },
-        expected: "ASK_CLARIFYING_QUESTIONS",
+        expected: "DO_NOTHING",
       },
     ])("$name", async ({ request, expected }) => {
       const result = await runDecision(request);
@@ -422,6 +422,15 @@ describe("runDecision", () => {
     const result = await runDecision({
       request_note:
         "Evaluate my portfolio against the current investment policy.\n\nPortfolio state:\n- Total value: £100,000\n- Asset allocation:\n  - Equities: 55%\n  - Bonds: 35%\n  - Cash: 10%\n\nThere are no new contributions or withdrawals planned.\n\nGenerate a decision snapshot and recommendation.",
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.55, BONDS: 0.35, CASH: 0.1 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
       risk_inputs: defaultRiskInputs,
     });
 
@@ -475,22 +484,49 @@ describe("runDecision", () => {
     const result = await runDecision({
       request_note:
         "Evaluate against policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. Planned contribution: £2,000.",
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        cash_flows: {
+          pending_contributions_gbp: 2000,
+          pending_withdrawals_gbp: 0,
+        },
+      },
       risk_inputs: defaultRiskInputs,
     });
 
     expect(result.snapshot.recommendation.type).toBe("REBALANCE_VIA_CONTRIBUTIONS");
   });
 
-  it("keeps DO_NOTHING regardless of prompt tone (prompt invariance)", async () => {
+  it("keeps DO_NOTHING regardless of request note tone when typed inputs are the same", async () => {
     const neutral = await runDecision({
       request_note:
         "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
       risk_inputs: defaultRiskInputs,
     });
 
     const emotional = await runDecision({
       request_note:
         "Please, I am really worried and want action. Evaluate my portfolio: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
       risk_inputs: defaultRiskInputs,
     });
 
@@ -517,6 +553,15 @@ describe("runDecision", () => {
     const result = await runDecision({
       request_note:
         "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
       risk_inputs: defaultRiskInputs,
     });
 
@@ -541,6 +586,15 @@ describe("runDecision", () => {
     const result = await runDecision({
       request_note:
         "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
       risk_inputs: defaultRiskInputs,
     });
 
@@ -553,6 +607,15 @@ describe("runDecision", () => {
     const result = await runDecision({
       request_note:
         "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
       risk_inputs: defaultRiskInputs,
     });
 
@@ -579,6 +642,15 @@ describe("runDecision", () => {
     const result = await runDecision({
       request_note:
         "Evaluate against policy. Portfolio state: Equities 90%, Bonds 8%, Cash 2%. No new cash flows.",
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.9, BONDS: 0.08, CASH: 0.02 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
       risk_inputs: defaultRiskInputs,
     });
 
@@ -604,6 +676,15 @@ describe("runDecision", () => {
     const result = await runDecision({
       request_note:
         "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
       risk_inputs: defaultRiskInputs,
     });
 
